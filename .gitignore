@@ -1,0 +1,19 @@
+# Build könyvtárak
+cmake-build-*/
+build/
+bin/
+
+# Fordítási kimenetek és futtatható fájlok
+*.exe
+*.o
+*.obj
+*.out
+
+# CLion és IDE fájlok
+.idea/
+cmake-build-debug/
+.vscode/
+
+# Operációs rendszer fájlok
+.DS_Store
+Thumbs.db
