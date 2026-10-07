@@ -1,0 +1,81 @@
+# Word Predictor & Small Language Model (PPMI)
+
+A high-performance C++20 count-based language model that predicts subsequent words in a sequence using **Positive Pointwise Mutual Information (PPMI)**. The project models statistical co-occurrences of words across literary text corpora and leverages hybrid sparse matrix data structures built with custom hash tables.
+
+---
+
+## Architecture & Project Structure
+
+The project strictly separates class declarations and implementations across clean modular components:
+
+```text
+Word_Predictor/
+├── CMakeLists.txt              # Build configuration (C++20, strict flags)
+├── README.md                   # Documentation
+├── include/                    # Header files (declarations)
+│   ├── CoOccurrenceMatrix.hpp
+│   └── PPMIMatrix.hpp
+└── src/                        # Source files (definitions & pipeline)
+    ├── CoOccurrenceMatrix.cpp
+    ├── PPMIMatrix.cpp
+    └── main.cpp
+```
+
+---
+
+## Detailed Class & Component Overview
+
+### 1. `customHash`
+* **Algorithm**: Implemented using the classic **djb2 hash function**.
+* **Purpose**: Computes an unsigned long hash for `std::string` tokens to distribute words uniformly across buckets.
+
+### 2. `TargetNode` & `TargetTable`
+* **Purpose**: Manages the inner sparse matrix entries for word co-occurrences (target words that follow a given context word).
+* **Collision Resolution**: Uses **Separate Chaining** via `std::vector<std::list<TargetNode>>`.
+* **Key Functionality**:
+  * `add(targetWord)`: Hashes the target word into a bucket and increments its transition frequency, or appends a new node if unseen.
+
+### 3. `ContextRow` & `CoOccurrenceMatrix`
+* **Purpose**: Represents the outer context table storing the primary vocabulary and global frequency counts.
+* **Collision Resolution**: Uses **Open Addressing with Linear Probing** to achieve fast average O(1) lookups.
+* **Key Responsibilities**:
+  * `addOccurrence(prevWord, currentWord)`: Updates the unigram frequency f(w), total token count N, and appends the transition into `prevWord`'s `TargetTable`.
+  * `findOrCreateIndex(word)`: Locates or allocates a bucket for a word; throws `std::runtime_error` on hash table saturation.
+  * `getGlobalCount(word)`: Retrieves unigram frequency counts f(w) required for probability normalization.
+
+### 4. `PPMITargetNode`, `PPMITargetTable`, `PPMIRow` & `PPMIMatrix`
+* **Purpose**: Computes and stores normalized information-theoretic association weights between words.
+* **PPMI Mathematical Formulation**:
+  $$\text{PMI}(w, c) = \log_2 \left( \frac{f(w, c) \cdot N}{f(w) \cdot f(c)} \right)$$
+  $$\text{PPMI}(w, c) = \max(0, \text{PMI}(w, c))$$
+* **Key Methods**:
+  * `buildFromCoOccurrence(cooc)`: Iterates through populated context rows and transforms raw bigram frequencies into non-negative PPMI values.
+  * `predictDeterministic(contextWord)`: Selects the successor word with the highest absolute PPMI score.
+  * `predictStochastic(contextWord, K)`: Employs an in-place Selection Sort to rank candidates and randomly samples from the Top-K (default: K = 3) candidates to enable diverse text generation.
+  * `generateSequence(cooc, startWord, length, deterministic)`: Generates an n-token sequence iteratively using the trained language model state.
+
+### 5. `main.cpp`
+* **Corpus Processing**: Reads input text files, strips non-alphanumeric noise (preserving apostrophes), and normalizes text to lowercase.
+* **Pipeline Execution**: Trains on input corpora (Agatha Christie, William Shakespeare), builds matrix representations, and executes automated generation test cases.
+
+---
+
+## Build & Run
+
+### Prerequisites
+* C++20 compliant compiler (`g++` 10+, `clang++` 11+, or MSVC 2019+)
+* CMake 3.14+
+
+### Build via CMake:
+```bash
+mkdir build
+cd build
+cmake ..
+cmake --build .
+```
+
+### Direct Compilation (GCC/Clang):
+```bash
+g++ -std=c++20 -Wall -Wextra -Werror -pedantic src/main.cpp src/CoOccurrenceMatrix.cpp src/PPMIMatrix.cpp -Iinclude -o Word_Predictor
+./Word_Predictor
+```
